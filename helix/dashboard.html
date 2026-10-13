@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helix</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 30'%3E%3Cpath d='M5 1 C 21 8, 21 22, 5 29' fill='none' stroke='%232a78d6' stroke-width='3'/%3E%3Cpath d='M21 1 C 5 8, 5 22, 21 29' fill='none' stroke='%23eb6834' stroke-width='3'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #f5f4f0; --card: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e; --muted: #8a8984; --rule: #e4e3df;
+    --deep: #2a78d6; --wide: #eb6834; --tune: #1baf7a; --cmp1: #eda100; --cmp2: #e87ba4; --cmp3: #6250d6;
+    --good: #1f7a3a; --bad: #b3261e; --warn: #9a6700; --focus: #2a78d6;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #121211; --card: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #8f8d85; --rule: #302f2b;
+      --deep: #3987e5; --wide: #d95926; --tune: #199e70; --cmp1: #c98500; --cmp2: #d55181; --cmp3: #9085e9;
+      --good: #4caf6e; --bad: #e66767; --warn: #d4a72c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #121211; --card: #1a1a19; --ink: #f0efec; --ink2: #c3c2b7; --muted: #8f8d85; --rule: #302f2b;
+    --deep: #3987e5; --wide: #d95926; --tune: #199e70; --cmp1: #c98500; --cmp2: #d55181; --cmp3: #9085e9;
+    --good: #4caf6e; --bad: #e66767; --warn: #d4a72c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.45 var(--sans); }
+  button, select, input { font: inherit; color: inherit; }
+  button { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--ink2); }
+  button.go { background: var(--ink); color: var(--card); border-color: var(--ink); }
+  button.danger { color: var(--bad); }
+  button:focus-visible, select:focus-visible, input:focus-visible, .node:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  select, input[type=number], input[type=text], input[type=password] { background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 8px; max-width: 100%; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand h1 { margin: 0; font-size: 20px; letter-spacing: .02em; }
+  .brand small { color: var(--muted); }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  #runPicker { max-width: 380px; }
+  .card { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink2); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+  .card h3 { font-size: 13px; color: var(--ink2); margin: 14px 0 6px; font-weight: 600; }
+  .hint { color: var(--muted); font-size: 12.5px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .health { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border: 1px solid var(--rule); border-radius: 999px; background: var(--card); font-size: 13px; max-width: 100%; }
+  .pill b { font-weight: 600; }
+  .pill span.d { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: var(--good); } .dot.bad { background: var(--bad); } .dot.run { background: var(--deep); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+  .tile { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 14px 16px; min-width: 0; }
+  .tile .k { color: var(--ink2); font-size: 12.5px; }
+  .tile .v { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tile .s { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .ok { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .flowbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .svgwrap { overflow-x: auto; }
+  #flow { width: 100%; min-width: 760px; height: auto; display: block; }
+  #flow text { font-family: var(--sans); fill: var(--ink); }
+  #flow .sub { fill: var(--ink2); font-size: 12.5px; }
+  #flow .note { fill: var(--muted); font-size: 11.5px; }
+  #flow .edge { fill: none; stroke: var(--rule); stroke-width: 2; }
+  #flow .edge.live { stroke: var(--ink2); stroke-dasharray: 6 6; animation: flowdash 1s linear infinite; }
+  @keyframes flowdash { to { stroke-dashoffset: -12; } }
+  .node { cursor: pointer; }
+  .node rect.box { fill: var(--card); stroke-width: 2; }
+  .node.waiting rect.box { stroke-dasharray: 5 4; }
+  .node.off { opacity: .32; }
+  .node.active rect.box { stroke-width: 3.5; animation: glow 1.4s ease-in-out infinite; }
+  .node.failed rect.box { stroke: var(--bad) !important; }
+  .node.sel rect.box { fill: color-mix(in srgb, var(--card) 86%, var(--ink) 14%); }
+  @keyframes glow { 50% { stroke-opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { .node.active rect.box, #flow .edge.live, .dot.run { animation: none; } }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--ink2); margin: 2px 0 8px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 6px; border-radius: 2px; }
+  .legend i.dot2 { width: 9px; height: 9px; border-radius: 50%; }
+  .legend i.dash { background: repeating-linear-gradient(90deg, var(--muted) 0 5px, transparent 5px 9px); }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--ink2); font-weight: 600; font-size: 12px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.click { cursor: pointer; } tr.click:hover td { background: color-mix(in srgb, var(--card) 90%, var(--ink) 10%); }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; color: #fff; background: var(--ink2); white-space: nowrap; }
+  .chip.deep { background: var(--deep); } .chip.wide { background: var(--wide); } .chip.tune { background: var(--tune); }
+  .tag { display: inline-block; padding: 0 6px; border: 1px solid var(--rule); border-radius: 6px; font-size: 11.5px; color: var(--ink2); }
+  pre.code { background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 10px; overflow: auto; font: 12px/1.45 var(--mono); max-height: 420px; white-space: pre; margin: 6px 0; }
+  pre.text { white-space: pre-wrap; }
+  .add { color: var(--good); } .del { color: var(--bad); }
+  .hyp { border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+  .hyp .meta { color: var(--ink2); font-size: 12.5px; margin-bottom: 4px; }
+  .v-supported, .v-removal-helps { color: var(--good); } .v-redundant { color: var(--warn); } .v-refuted, .v-invalid { color: var(--bad); } .v-matters { color: var(--deep); }
+  .empty { color: var(--muted); padding: 18px 0; text-align: center; }
+  #chart { width: 100%; min-width: 620px; height: auto; display: block; }
+  #chart text { font-family: var(--sans); fill: var(--ink2); font-size: 12px; }
+  .tip { position: fixed; pointer-events: none; background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; z-index: 5; min-width: 180px; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 5px 10px; text-transform: none; letter-spacing: 0; }
+  .seg button.on { background: var(--ink); color: var(--card); }
+  dialog { border: 1px solid var(--rule); border-radius: 14px; background: var(--card); color: var(--ink); padding: 0; width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog .dh { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--rule); background: var(--card); }
+  dialog .db { padding: 14px 16px; overflow: auto; max-height: calc(100vh - 140px); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .grid2 label { display: block; font-size: 12.5px; color: var(--ink2); margin-bottom: 3px; }
+  .grid2 input, .grid2 select { width: 100%; }
+  .out { white-space: pre-wrap; font: 12px/1.45 var(--mono); color: var(--ink2); margin-top: 8px; }
+  details > summary { cursor: pointer; color: var(--ink2); }
+  .cmpchips { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .cmpchip { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--rule); border-radius: 999px; padding: 2px 4px 2px 10px; font-size: 12.5px; }
+  .cmpchip i { width: 10px; height: 3px; border-radius: 2px; display: inline-block; }
+  .cmpchip button { border: 0; padding: 0 6px; background: transparent; }
+  @media (max-width: 860px) { .tiles { grid-template-columns: 1fr 1fr; } .grid2 { grid-template-columns: 1fr; } }
+  @media (max-width: 520px) { .tiles { grid-template-columns: 1fr; } .pill span.d { max-width: 180px; } #runPicker { max-width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg width="26" height="30" viewBox="0 0 26 30" aria-hidden="true"><path d="M5 1 C 21 8, 21 22, 5 29" fill="none" stroke="var(--deep)" stroke-width="2.4" stroke-linecap="round"/><path d="M21 1 C 5 8, 5 22, 21 29" fill="none" stroke="var(--wide)" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <div><h1>Helix</h1><small id="brandSub">deep + wide evolutionary search</small></div>
+    </div>
+    <div class="bar">
+      <select id="runPicker" aria-label="Run"></select>
+      <button class="go" id="newBtn">New run</button>
+      <button id="stopBtn" title="Finish the current generation, save, exit">Stop</button>
+      <button class="danger" id="killBtn" title="Stop immediately">Kill</button>
+      <button id="resumeBtn" title="Continue this run for more generations">Resume</button>
+      <button id="reportBtn" title="Score the best program on held-out instances">Held-out check</button>
+      <button id="publishBtn" title="Copy the trace into results/ in the repo">Publish</button>
+      <button id="settingsBtn">Connect</button>
+    </div>
+  </header>
+
+  <div class="health" id="health"></div>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">Progress to optimal</div><div class="v" id="tProg">–</div><div class="s" id="tProgS">0% = Code Zero, 100% = the optimal packing</div></div>
+    <div class="tile"><div class="k">Extra bins vs optimal</div><div class="v" id="tWaste">–</div><div class="s" id="tWasteS">per 100 bins the optimal packing needs</div></div>
+    <div class="tile"><div class="k">Score (evaluator's units)</div><div class="v" id="tScore">–</div><div class="s" id="tScoreS"></div></div>
+    <div class="tile"><div class="k">vs best classic heuristic</div><div class="v" id="tClassic">–</div><div class="s" id="tClassicS"></div></div>
+  </div>
+
+  <section class="card">
+    <h2><span>Generation <span id="flowGen">–</span> · the loop</span>
+      <span class="flowbar">
+        <button id="genPrev" aria-label="Previous generation">◀</button>
+        <select id="genPicker" aria-label="Generation"></select>
+        <button id="genNext" aria-label="Next generation">▶</button>
+        <label class="hint"><input type="checkbox" id="follow" checked> follow live</label>
+      </span>
+    </h2>
+    <div class="svgwrap"><svg id="flow" viewBox="0 0 1120 340" role="img" aria-label="Flowchart of one generation"></svg></div>
+    <div class="hint" id="phaseLine">Pick a run, or start one.</div>
+  </section>
+
+  <section class="card">
+    <h2><span id="detailTitle">Details</span><span class="hint">Click a step in the loop to see what it did in this generation.</span></h2>
+    <div id="detail"><div class="empty">Click a step in the loop above.</div></div>
+  </section>
+
+  <section class="card">
+    <h2><span>Progress</span>
+      <span class="flowbar">
+        <span class="seg" id="unitSeg"><button data-u="progress" class="on">Progress to optimal</button><button data-u="score">Evaluator score</button></span>
+        <span class="seg" id="xSeg"><button data-x="generation" class="on">Generation</button><button data-x="minutes">Minutes</button></span>
+      </span>
+    </h2>
+    <div class="flowbar" style="margin-bottom:6px">
+      <span class="hint">Compare with:</span>
+      <select id="cmpPicker" aria-label="Add a run to compare"><option value="">add a run…</option></select>
+      <span class="cmpchips" id="cmpChips"></span>
+    </div>
+    <div class="legend" id="chartLegend"></div>
+    <div class="svgwrap"><svg id="chart" viewBox="0 0 1000 360" role="img" aria-label="Best program by generation"></svg></div>
+    <div class="tablewrap" id="cmpTable"></div>
+  </section>
+
+  <section class="card">
+    <details><summary>Console</summary><pre class="code text" id="console">–</pre></details>
+  </section>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<dialog id="dlg"><div class="dh"><b id="dlgTitle"></b><button id="dlgClose">Close</button></div><div class="db" id="dlgBody"></div></dialog>
+
+<dialog id="settingsDlg">
+  <div class="dh"><b>Connect</b><button data-close>Close</button></div>
+  <div class="db">
+    <div class="grid2">
+      <div><label for="HELIX_PROVIDER">Provider</label><select id="HELIX_PROVIDER"><option value="luminal">Luminal Cloud</option><option value="local">Local model (Ollama, LM Studio)</option></select></div>
+      <div><label for="HELIX_FLASH_MODEL">Model</label><input type="text" id="HELIX_FLASH_MODEL"></div>
+      <div><label for="LUMINAL_BASE_URL">Luminal base URL</label><input type="text" id="LUMINAL_BASE_URL"></div>
+      <div><label for="LUMINAL_API_KEY">Luminal API key</label><input type="password" id="LUMINAL_API_KEY" autocomplete="off"></div>
+      <div><label for="HELIX_PRO_MODEL">Pro model (optional)</label><input type="text" id="HELIX_PRO_MODEL"></div>
+      <div><label for="LUMINAL_EXTRA_BODY">Extra request JSON (optional)</label><input type="text" id="LUMINAL_EXTRA_BODY"></div>
+      <div><label for="LOCAL_BASE_URL">Local base URL</label><input type="text" id="LOCAL_BASE_URL"></div>
+      <div><label for="LOCAL_MODEL">Local model</label><input type="text" id="LOCAL_MODEL"></div>
+      <div><label for="MONGODB_URI">MongoDB URI (optional)</label><input type="password" id="MONGODB_URI" autocomplete="off" placeholder="mongodb+srv://…"></div>
+      <div><label for="MONGODB_DB">MongoDB database</label><input type="text" id="MONGODB_DB"></div>
+    </div>
+    <div class="bar" style="margin-top:12px"><button class="go" id="saveBtn">Save</button><button id="testLlmBtn">Test model</button><button id="testMongoBtn">Test MongoDB</button></div>
+    <div class="hint" style="margin-top:6px">Saved to helix/.env on this machine (never committed). Saved keys aren't shown again; leave a key blank to keep it.</div>
+    <div class="out" id="connectOut"></div>
+  </div>
+</dialog>
+
+<dialog id="newDlg">
+  <div class="dh"><b>New run</b><button data-close>Close</button></div>
+  <div class="db">
+    <div class="grid2">
+      <div style="grid-column:1/-1"><label for="engine">Engine</label><select id="engine">
+        <option value="features">Feature engine: agents write features, an optimiser fits the weights</option>
+        <option value="programs">Program engine (version 1): agents write whole programs</option></select></div>
+      <div><label for="mode">Mode</label><select id="mode"><option value="full">Full: deep + wide</option><option value="wide-only">Wide only (control)</option><option value="deep-only">Deep only (control)</option><option value="zero-shot">Zero-shot (control, program engine)</option></select></div>
+      <div><label for="generations">Generations</label><input type="number" id="generations" value="30" min="1"></div>
+      <div><label for="max_minutes">Time limit (minutes, 0 = none)</label><input type="number" id="max_minutes" value="0" min="0"></div>
+      <div><label for="workers">Agent calls in parallel</label><input type="number" id="workers" value="12" min="1"></div>
+    </div>
+    <details style="margin-top:10px"><summary>More settings</summary>
+      <div class="grid2" style="margin-top:8px">
+        <div><label for="variants" id="variantsLabel">Mutator features per generation</label><input type="number" id="variants" min="1" placeholder="4"></div>
+        <div><label for="fresh">…of which fresh ideas</label><input type="number" id="fresh" min="0" placeholder="1"></div>
+        <div><label for="hypotheses" id="hypothesesLabel">Researcher feature ideas</label><input type="number" id="hypotheses" value="4" min="1"></div>
+        <div><label for="pro_every">Pro model every N calls (0 = never)</label><input type="number" id="pro_every" value="10" min="0"></div>
+      </div>
+      <div class="grid2 eng-features" style="margin-top:10px">
+        <div><label for="trial_evals">Weight search per feature tried (evaluations)</label><input type="number" id="trial_evals" value="24" min="4"></div>
+        <div><label for="refit_evals">Joint refit when features are kept (evaluations)</label><input type="number" id="refit_evals" value="64" min="4"></div>
+        <div><label for="accept_margin">Validation gain needed to keep a feature</label><input type="number" id="accept_margin" value="0.03" step="0.01" min="0"></div>
+        <div><label for="fit_workers">CPU cores for fitting (blank = all but one)</label><input type="number" id="fit_workers" min="1" placeholder="all but one"></div>
+        <div><label><input type="checkbox" id="inspect" checked> Show the Researcher near-optimal packings</label></div>
+      </div>
+      <div class="grid2 eng-programs" style="margin-top:10px">
+        <div><label for="pool_size">Pool size</label><input type="number" id="pool_size" value="8" min="2"></div>
+        <div><label for="epsilon">Verdict threshold</label><input type="number" id="epsilon" value="0.05" step="0.01" min="0"></div>
+        <div><label for="judge_tune_evals">Tuning per deep test (evaluations)</label><input type="number" id="judge_tune_evals" value="16" min="0"></div>
+        <div><label><input type="checkbox" id="tune" checked> Tune branch</label></div>
+      </div>
+    </details>
+    <label class="hint" style="display:block;margin-top:10px"><input type="checkbox" id="fake"> Offline test: fake model, no credits used, nothing published</label>
+    <div class="bar" style="margin-top:12px"><button class="go" id="runBtn">▶ Start</button></div>
+    <div class="out" id="runOut"></div>
+  </div>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (x, d = 3) => x == null || Number.isNaN(x) ? "–" : Number(x).toFixed(d);
+const signed = (x, d = 3) => x == null ? "–" : (x >= 0 ? "+" : "−") + Math.abs(x).toFixed(d);
+const pct = (x, d = 1) => x == null ? "–" : `${Number(x).toFixed(d)}%`;
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const t = await r.text(); let j; try { j = JSON.parse(t); } catch { j = t; }
+  if (!r.ok) throw new Error((j && j.error) || t || r.statusText);
+  return j;
+}
+function setHTML(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } }
+
+let current = null, state = null, series = {}, refs = {}, compare = [], selNode = "researcher", selGen = null, detailCache = {};
+let unit = "progress", xAxis = "generation";
+const CMP_COLORS = ["var(--cmp1)", "var(--cmp2)", "var(--cmp3)"];
+try { compare = JSON.parse(localStorage.getItem("helix.compare") || "[]"); } catch { compare = []; }
+
+// ---------------------------------------------------------------- runs
+async function refreshRuns() {
+  const r = await api("/api/runs");
+  if (!current) current = r.active || (r.runs[0] && r.runs[0].name) || null;
+  const label = (x) => `${x.name} · ${x.state}${x.published ? " · published" : ""}${x.best_score != null ? " · " + fmt(x.best_score) : ""}`;
+  setHTML($("runPicker"), r.runs.map((x) => `<option value="${esc(x.name)}" ${x.name === current ? "selected" : ""}>${esc(label(x))}</option>`).join("") || `<option>no runs yet</option>`);
+  setHTML($("cmpPicker"), `<option value="">add a run…</option>` + r.runs.filter((x) => x.name !== current && !compare.includes(x.name)).map((x) => `<option value="${esc(x.name)}">${esc(label(x))}</option>`).join(""));
+}
+$("runPicker").onchange = () => { current = $("runPicker").value; selGen = null; detailCache = {}; $("follow").checked = true; refreshRuns(); tick(true); };
+$("cmpPicker").onchange = () => { const v = $("cmpPicker").value; if (v && compare.length < 3) { compare.push(v); saveCompare(); loadSeries(v).then(drawChart); refreshRuns(); } $("cmpPicker").value = ""; };
+function saveCompare() { try { localStorage.setItem("helix.compare", JSON.stringify(compare)); } catch { } renderCmpChips(); }
+function renderCmpChips() {
+  setHTML($("cmpChips"), compare.map((n, i) => `<span class="cmpchip"><i style="background:${CMP_COLORS[i]}"></i>${esc(n)}<button data-rm="${esc(n)}" aria-label="Stop comparing with ${esc(n)}">×</button></span>`).join(""));
+  $("cmpChips").querySelectorAll("[data-rm]").forEach((b) => b.onclick = () => { compare = compare.filter((x) => x !== b.dataset.rm); saveCompare(); drawChart(); refreshRuns(); });
+}
+async function loadSeries(name) { try { series[name] = await api(`/api/runs/${name}/series`); } catch { delete series[name]; } }
+
+// ---------------------------------------------------------------- polling
+let ticking = false, lastSeries = 0, lastHealth = 0;
+async function tick(force = false) {
+  if (ticking || !current) return; ticking = true;
+  try {
+    state = await api(`/api/runs/${current}`);
+    renderState();
+    const now = Date.now();
+    if (force || now - lastSeries > 5000 || !series[current]) {
+      lastSeries = now;
+      await Promise.all([loadSeries(current), ...compare.filter((n) => !series[n]).map(loadSeries)]);
+      renderTiles(); drawChart();
+    }
+    if (force || now - lastHealth > 10000) { lastHealth = now; renderHealth(await api(`/api/health?run=${encodeURIComponent(current)}`)); }
+    await renderFlowAndDetail(force);
+  } catch (e) { $("phaseLine").innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+  finally { ticking = false; }
+}
+
+// ---------------------------------------------------------------- health + tiles
+function renderHealth(h) {
+  const st = (state && state.status) || {}, s = st.state || "unknown";
+  const el = st.started ? ((st.finished || Date.now() / 1000) - st.started) / 60 : null;
+  const pill = (name, ok, detail) => `<span class="pill"><i class="dot ${ok === true ? "ok" : ok === false ? "bad" : ""}"></i><b>${name}</b><span class="d" title="${esc(detail)}">${esc(detail)}</span></span>`;
+  const runDot = s === "running" ? "run" : s === "finished" ? "ok" : (s === "crashed" || s === "died") ? "bad" : "";
+  setHTML($("health"),
+    `<span class="pill"><i class="dot ${runDot}"></i><b>Run</b><span class="d">${esc(s)} · generation ${st.generation ?? "–"} / ${st.generations ?? "?"}${el != null ? ` · ${el.toFixed(0)} min` : ""}</span></span>`
+    + pill("Model", h.model.ok, h.model.detail) + pill("Evaluator", h.evaluator.ok, h.evaluator.detail)
+    + pill("MongoDB", h.mongo.ok, h.mongo.detail) + pill("Optimal bounds", h.bounds.ok, h.bounds.detail));
+}
+
+function bestRow() {
+  // The newest best: the live best program (found mid-generation) if it's ahead of the last finished generation.
+  const s = series[current], last = s && s.series.length ? s.series[s.series.length - 1] : null, live = state && state.best;
+  if (live && live.units && (!last || live.score > last.score)) return { ...live.units, score: live.score };
+  return last;
+}
+function renderTiles() {
+  const b = bestRow(), start = series[current] && series[current].start, bc = refs.best_classic;
+  $("tProg").textContent = b && b.progress != null ? pct(b.progress) : "–";
+  $("tProgS").textContent = b && b.progress != null ? "0% = Code Zero (first fit), 100% = the optimal packing" : "needs the optimal-packing bounds";
+  $("tWaste").textContent = b && b.waste != null ? fmt(b.waste, 2) : "–";
+  $("tWasteS").textContent = start && start.waste != null ? `per 100 bins the optimum needs · Code Zero ${fmt(start.waste, 2)}` : "per 100 bins the optimal packing needs";
+  $("tScore").textContent = b ? fmt(b.score) : "–";
+  const ho = state && state.heldout;
+  $("tScoreS").textContent = (start ? `Code Zero ${fmt(start.score)}` : "") + (refs.optimal ? ` · optimum ${fmt(refs.optimal.score, 2)}` : "")
+    + (ho ? ` · held-out ${fmt(ho.score)}${ho.progress != null ? ` (${pct(ho.progress)})` : ""}` : "");
+  if (b && bc) {
+    const usePct = b.progress != null && bc.progress != null;
+    const ahead = usePct ? `${signed(b.progress - bc.progress, 1)} pts` : signed(b.score - bc.score);
+    $("tClassic").innerHTML = `<span class="${b.score > bc.score ? "ok" : "warn"}">${esc(ahead)}</span>`;
+    $("tClassicS").textContent = `${bc.label}: ${usePct ? pct(bc.progress) : fmt(bc.score)}`;
+  } else { $("tClassic").textContent = "–"; $("tClassicS").textContent = "computing…"; }
+}
+
+function renderState() {
+  const st = state.status || {};
+  $("brandSub").textContent = engine() === "features" ? "feature engine: agents invent features, an optimiser fits the weights" : "program engine: agents write whole programs";
+  setHTML($("console"), esc(state.console || "–"));
+  const gens = (state.generations || []).map((g) => g.generation);
+  const live = st.state === "running" ? st.flow_generation : null;
+  const all = [...new Set([...gens, ...(live != null ? [live] : [])])].sort((a, b) => a - b);
+  if ($("follow").checked || selGen == null) selGen = live != null ? live : (all.length ? all[all.length - 1] : null);
+  setHTML($("genPicker"), all.map((g) => `<option value="${g}" ${g === selGen ? "selected" : ""}>${g}${g === live ? " (live)" : ""}</option>`).join(""));
+  $("flowGen").textContent = selGen ?? "–";
+  $("phaseLine").textContent = st.state === "running" ? (st.phase || "working…") : `Run ${st.state || "unknown"}${st.error ? ": " + st.error.split("\n").pop() : ""}`;
+}
+$("genPicker").onchange = () => { selGen = +$("genPicker").value; $("follow").checked = false; renderFlowAndDetail(true); };
+$("genPrev").onclick = () => stepGen(-1); $("genNext").onclick = () => stepGen(1);
+function stepGen(d) {
+  const opts = [...$("genPicker").options].map((o) => +o.value), i = opts.indexOf(selGen), j = Math.max(0, Math.min(opts.length - 1, i + d));
+  if (opts[j] != null) { selGen = opts[j]; $("follow").checked = false; renderState(); renderFlowAndDetail(true); }
+}
+
+// ---------------------------------------------------------------- the loop (flowchart)
+// Two engines, two loops. programs (v1): agents write whole programs. features (v2): agents write features,
+// an optimiser fits the weights, validation decides what is kept.
+const LAYOUTS = {
+  programs: {
+    nodes: {
+      pool:       { x: 20,  y: 120, w: 150, h: 76, title: "Pool", sub: "best programs so far", color: "var(--ink2)" },
+      researcher: { x: 230, y: 18,  w: 180, h: 76, title: "Researcher", sub: "why does the best win?", color: "var(--deep)" },
+      coder:      { x: 450, y: 18,  w: 180, h: 76, title: "Coder", sub: "one test per hypothesis", color: "var(--deep)" },
+      mutator:    { x: 340, y: 120, w: 180, h: 76, title: "Mutator", sub: "variants + fresh ideas", color: "var(--wide)" },
+      tune:       { x: 340, y: 222, w: 180, h: 76, title: "Tune", sub: "polish the numbers", color: "var(--tune)" },
+      evaluator:  { x: 700, y: 120, w: 170, h: 76, title: "Evaluator", sub: "scores every program", color: "var(--ink2)" },
+      merge:      { x: 930, y: 120, w: 170, h: 76, title: "Merge", sub: "keep the best 8", color: "var(--ink2)" },
+    },
+    edges: [
+      ["pool", "researcher", "M170 150 C 200 150, 200 56, 228 56"], ["researcher", "coder", "M410 56 L 448 56"],
+      ["coder", "evaluator", "M630 56 C 670 56, 660 150, 698 150"], ["pool", "mutator", "M170 158 L 338 158"],
+      ["mutator", "evaluator", "M520 158 L 698 158"], ["pool", "tune", "M170 166 C 250 166, 250 260, 338 260"],
+      ["tune", "evaluator", "M520 260 C 620 260, 640 172, 698 172"], ["evaluator", "merge", "M870 158 L 928 158"],
+      ["merge", "pool", "M1015 196 L 1015 318 L 95 318 L 95 198"],
+    ],
+    notes: [[760, 334, "next generation: the merged pool goes round again"], [430, 110, "air gap: the Mutator sees only code and scores"]],
+  },
+  features: {
+    nodes: {
+      library:    { x: 20,  y: 130, w: 140, h: 76, title: "Library", sub: "the champion's features", color: "var(--ink2)" },
+      inspect:    { x: 196, y: 26,  w: 168, h: 76, title: "Inspect", sub: "packings vs optimum", color: "var(--ink2)" },
+      researcher: { x: 400, y: 26,  w: 172, h: 76, title: "Researcher", sub: "what can't it see?", color: "var(--deep)" },
+      coder:      { x: 608, y: 26,  w: 164, h: 76, title: "Coder", sub: "writes each feature", color: "var(--deep)" },
+      mutator:    { x: 400, y: 234, w: 172, h: 76, title: "Mutator", sub: "variants + fresh ones", color: "var(--wide)" },
+      fit:        { x: 812, y: 130, w: 140, h: 76, title: "Fit", sub: "refit, validate", color: "var(--tune)" },
+      accept:     { x: 972, y: 130, w: 132, h: 76, title: "Accept", sub: "keep what helps", color: "var(--ink2)" },
+    },
+    edges: [
+      ["library", "inspect", "M160 160 C 178 160, 176 64, 194 64"], ["inspect", "researcher", "M364 64 L 398 64"],
+      ["researcher", "coder", "M572 64 L 606 64"], ["coder", "fit", "M772 64 C 800 64, 790 160, 810 160"],
+      ["library", "mutator", "M160 176 C 290 176, 270 272, 398 272"], ["mutator", "fit", "M572 272 C 720 272, 770 176, 810 176"],
+      ["fit", "accept", "M952 168 L 970 168"], ["accept", "library", "M1038 206 L 1038 322 L 90 322 L 90 208"],
+    ],
+    notes: [[560, 337, "next generation: the new champion goes round again"], [486, 162, "air gap: the Mutator sees only"], [486, 177, "the policy's code and its score"]],
+  },
+};
+const engine = () => (state && state.engine) || "programs";
+const layout = () => LAYOUTS[engine()] || LAYOUTS.programs;
+function verdictNote(hyps) { const c = {}; hyps.forEach((h) => c[h.verdict] = (c[h.verdict] || 0) + 1); return Object.entries(c).map(([k, v]) => `${v} ${k}`).join(", "); }
+const gapsOf = (diag) => Object.entries(diag || {}).map(([fam, c]) => [fam, c.champion.bins - ((c.optimum || {}).bins ?? c.champion.bins)]).sort((a, b) => b[1] - a[1]);
+const colsOf = (lib) => (lib || []).reduce((n, x) => n + (x.columns || []).length, 0);
+function flowStatesFeatures(d) {
+  const f = {}, rec = d && d.record, br = (rec && rec.branches) || [], feats = (d && d.features) || [], hyps = (d && d.hypotheses) || [];
+  const lib = selGen === 0 ? (d && d.library_out) || [] : (d && d.library_in) || [];
+  f.library = lib.length ? { state: "done", sub: `${lib.length} feature${lib.length === 1 ? "" : "s"}`, note: `${colsOf(lib)} weights` } : { state: "done", sub: "empty", note: "= Code Zero" };
+  const gaps = gapsOf(d && d.diagnostics);
+  f.inspect = selGen === 0 || (d && d.inspect === false) ? { state: "off", note: d && d.inspect === false ? "switched off" : "" } : gaps.length ? { state: "done", sub: "extra bins vs optimum", note: gaps.slice(0, 2).map(([k, g]) => `${k} +${g}`).join(", ") } : { state: rec ? "failed" : "waiting", note: rec ? "no comparison" : "" };
+  const deep = feats.filter((x) => x.branch === "deep"), wide = feats.filter((x) => x.branch === "wide"), usable = (x) => x.status !== "invalid";
+  f.researcher = br.includes("deep") ? { state: hyps.length ? "done" : "failed", note: hyps.length ? `${hyps.length} feature ideas` : "no usable ideas" } : { state: "off" };
+  f.coder = br.includes("deep") && deep.length ? { state: "done", done: deep.filter(usable).length, total: deep.length, note: verdictNote(hyps) } : { state: "off" };
+  f.mutator = br.includes("wide") ? { state: "done", done: wide.filter(usable).length, total: wide.length, note: `${wide.filter((x) => x.status === "active" || x.status === "retired").length} kept` } : { state: "off" };
+  const fit = rec && rec.fit;
+  f.fit = selGen === 0 ? { state: "off" } : rec && fit ? { state: "done", sub: `${fit.trials} of ${fit.candidates} tried`, note: `${fit.evals} evaluations` } : { state: rec ? "done" : "waiting" };
+  const kept = (rec && rec.accepted) || [], ret = (rec && rec.retired) || [];
+  f.accept = rec ? { state: "done", sub: `champion ${rec.best_id}`, note: selGen === 0 ? "Code Zero" : (kept.length ? `kept ${kept.length}` : "nothing kept") + (ret.length ? `, retired ${ret.length}` : "") } : { state: "waiting" };
+  return f;
+}
+function flowStates(detail) {
+  const st = state.status || {};
+  if (st.flow_generation === selGen && st.flow && Object.keys(st.flow).length) return st.flow;
+  if (engine() === "features") return flowStatesFeatures(detail);
+  const f = {}, rec = detail && detail.record, br = (rec && rec.branches) || [], progs = (detail && detail.programs) || [];
+  const by = (b) => progs.filter((p) => p.branch === b), hyps = (detail && detail.hypotheses) || [];
+  f.pool = { state: "done", note: `${(detail && detail.pool_in.length) || 0} programs in` };
+  f.researcher = br.includes("deep") ? { state: hyps.length ? "done" : "failed", note: hyps.length ? `${hyps.length} hypotheses` : "no hypotheses" } : { state: "off" };
+  f.coder = br.includes("deep") && hyps.length ? { state: "done", done: by("deep").length, total: hyps.length, note: verdictNote(hyps) } : { state: "off" };
+  const w = by("wide");
+  f.mutator = br.includes("wide") ? { state: "done", done: w.length, total: w.length, note: `${w.filter((p) => p.valid).length}/${w.length} valid` } : { state: "off" };
+  const t = (rec && rec.tune) || null;
+  f.tune = br.includes("tune") ? { state: "done", note: t ? `${t.improved || 0} of ${(t.targets || []).length} improved` : "" } : { state: "off" };
+  f.evaluator = { state: progs.length ? "done" : "waiting", done: progs.length, note: `${progs.filter((p) => p.valid).length} valid of ${progs.length}` };
+  f.merge = rec ? { state: "done", note: `best ${fmt(rec.best_score)} (${rec.best_id})` } : { state: "waiting" };
+  return f;
+}
+function drawFlow(flow) {
+  const st = state.status || {}, live = st.state === "running" && st.flow_generation === selGen;
+  const lay = layout();
+  if (!lay.nodes[selNode]) selNode = "researcher";
+  let svg = `<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>`;
+  for (const [a, b, d] of lay.edges) {
+    const on = live && ((flow[a] || {}).state === "active" || (flow[b] || {}).state === "active");
+    svg += `<path class="edge ${on ? "live" : ""}" d="${d}" marker-end="url(#ah)"/>`;
+  }
+  for (const [x, y, t] of lay.notes) svg += `<text class="note" x="${x}" y="${y}" text-anchor="middle">${esc(t)}</text>`;
+  for (const [key, n] of Object.entries(lay.nodes)) {
+    const f = flow[key] || { state: "waiting" };
+    const count = f.total ? `${f.done ?? 0}/${f.total}` : f.running ? `${f.running} running` : f.done ? `${f.done} done` : "";
+    const stateText = { active: "running", done: "done", waiting: "waiting", off: "not used", failed: "failed" }[f.state] || f.state;
+    const room = Math.floor((n.w - 24) / 6.2), note = (f.note || "").length > room ? f.note.slice(0, room - 1) + "…" : (f.note || "");
+    svg += `<g class="node ${esc(f.state)} ${selNode === key ? "sel" : ""}" data-node="${key}" tabindex="0" role="button" aria-label="${n.title}: ${stateText}${note ? ", " + esc(note) : ""}">
+      <rect class="box" x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="12" stroke="${n.color}"/>
+      <text x="${n.x + 12}" y="${n.y + 22}" font-weight="700" font-size="15">${n.title}</text>
+      <text class="sub" x="${n.x + n.w - 10}" y="${n.y + 22}" text-anchor="end">${esc(count)}</text>
+      <text class="sub" x="${n.x + 12}" y="${n.y + 42}">${esc(f.state === "waiting" || f.state === "off" ? n.sub : f.state === "done" && f.sub ? f.sub : stateText)}</text>
+      <text class="note" x="${n.x + 12}" y="${n.y + 62}">${esc(note)}</text>
+    </g>`;
+  }
+  setHTML($("flow"), svg);
+  $("flow").querySelectorAll(".node").forEach((g) => {
+    const go = () => { selNode = g.dataset.node; renderFlowAndDetail(true); };
+    g.onclick = go; g.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+  });
+}
+let lastDetailFetch = 0;
+async function renderFlowAndDetail(force) {
+  if (selGen == null) { drawFlow({}); return; }
+  const st = state.status || {}, live = st.state === "running" && st.flow_generation === selGen;
+  const key = `${current}/${selGen}`;
+  let detail = detailCache[key];
+  if (!detail || force || (live && Date.now() - lastDetailFetch > 4000)) {
+    lastDetailFetch = Date.now();
+    try { detail = await api(`/api/runs/${current}/gen/${selGen}`); detailCache[key] = detail; } catch { detail = null; }
+  }
+  $("flowGen").textContent = selGen;
+  drawFlow(flowStates(detail));
+  renderDetail(detail);
+}
+
+// ---------------------------------------------------------------- what each step did
+function progTable(progs) {
+  if (!progs.length) return `<div class="empty">Nothing here in this generation.</div>`;
+  const rows = progs.map((p) => {
+    const u = p.units || {}, delta = p.score != null && p.parent_score != null ? p.score - p.parent_score : null;
+    return `<tr class="click" data-pid="${esc(p.id)}"><td>${esc(p.id)}</td><td><span class="chip ${esc(p.branch)}">${esc(p.branch)}</span>${p.probe ? ' <span class="tag">knock-out</span>' : ""}${p.repaired ? ' <span class="tag">repaired</span>' : ""}${p.duplicate_of ? ` <span class="tag">= ${esc(p.duplicate_of)}</span>` : ""}</td>
+      <td>${esc(p.parent_id || (p.branch === "wide" ? "fresh idea" : ""))}</td>
+      <td class="num">${p.valid ? fmt(p.score) : '<span class="bad">invalid</span>'}</td><td class="num">${u.progress != null ? pct(u.progress) : "–"}</td>
+      <td class="num">${delta != null ? `<span class="${delta > 0 ? "ok" : delta < 0 ? "bad" : ""}">${signed(delta)}</span>` : "–"}</td>
+      <td>${esc(((p.valid ? p.note : p.error) || "").split("\n").pop().slice(0, 140))}</td></tr>`;
+  });
+  return `<div class="tablewrap"><table><thead><tr><th>Program</th><th>Branch</th><th>From</th><th class="num">Score</th><th class="num">Progress</th><th class="num">vs parent</th><th>What it did</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+}
+function poolTable(list, fresh = new Set()) {
+  if (!list.length) return `<div class="empty">Empty.</div>`;
+  return `<div class="tablewrap"><table><thead><tr><th>Program</th><th>Branch</th><th class="num">Made in generation</th><th class="num">Score</th><th class="num">Progress</th></tr></thead><tbody>${list.map((p) => `<tr class="click" data-pid="${esc(p.id)}"><td>${esc(p.id)}${fresh.has(p.id) ? ' <span class="tag">new</span>' : ""}</td><td><span class="chip ${esc(p.branch)}">${esc(p.branch)}</span></td><td class="num">${p.generation}</td><td class="num">${fmt(p.score)}</td><td class="num">${p.progress != null ? pct(p.progress) : "–"}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function callTable(calls) {
+  if (!calls.length) return `<div class="empty">No agent calls recorded for this step.</div>`;
+  const ended = (c) => c.error ? '<span class="bad">error</span>' : c.finish === "length" ? '<span class="warn">cut off</span>' : c.finish === "thinking" ? '<span class="warn">stopped: thinking</span>' : esc(c.finish || "ok");
+  return `<div class="tablewrap"><table><thead><tr><th>Time</th><th>Agent</th><th class="num">Took</th><th class="num">Tokens out</th><th>Ended</th><th>Says</th></tr></thead><tbody>${calls.map((c) => `<tr class="click" data-line="${c.line}"><td>${esc(c.time)}</td><td>${esc(c.role)}${c.program ? ` · ${esc(c.program)}` : c.feature ? ` · ${esc(c.feature)}` : ""}</td><td class="num">${esc(c.seconds)}s</td><td class="num">${c.tokens_out ?? "–"}</td><td>${ended(c)}</td><td>${c.error ? `<span class="bad">${esc(c.error.slice(0, 120))}</span>` : esc(c.preview)}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function diffHTML(a, b) {
+  if (!a || !b) return `<pre class="code">${esc(b || "")}</pre>`;
+  const A = a.trim().split("\n"), B = b.trim().split("\n"), n = A.length, m = B.length;
+  const L = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i].trim() === B[j].trim() ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  let i = 0, j = 0; const out = [];
+  while (i < n || j < m) {
+    if (i < n && j < m && A[i].trim() === B[j].trim()) { out.push("  " + esc(B[j])); i++; j++; }
+    else if (j < m && (i >= n || L[i][j + 1] >= L[i + 1][j])) { out.push(`<span class="add">+ ${esc(B[j])}</span>`); j++; }
+    else { out.push(`<span class="del">- ${esc(A[i])}</span>`); i++; }
+  }
+  return `<pre class="code">${out.join("\n")}</pre>`;
+}
+function hypBlock(h, progs, withCode) {
+  const p = progs.find((x) => x.id === h.program_id);
+  const raw = h.raw_delta != null && h.delta != null && h.raw_delta !== h.delta ? ` <span class="hint">(as written ${signed(h.raw_delta)}; after tuning its new numbers ${signed(h.delta)})</span>` : "";
+  return `<div class="hyp"><div class="meta"><span class="tag">${esc(h.kind || "improve")}</span> ${esc(h.id)} on ${esc(h.base_id)}${h.builds_on ? ` · builds on ${esc(h.builds_on)}` : ""} · <b class="v-${esc(h.verdict)}">${esc(h.verdict)} ${h.delta != null ? signed(h.delta) : ""}</b>${raw}</div>
+    <div>${esc(h.claim)}</div><div class="hint">Change: ${esc(h.change)}</div>${h.prediction ? `<div class="hint">Predicted: ${esc(h.prediction)}</div>` : ""}
+    ${withCode && p ? `<details><summary>${esc(p.id)}: what changed from ${esc(h.base_id)}</summary>${diffHTML(p.parent_code, p.code)}</details>` : ""}</div>`;
+}
+// ---- feature engine
+const STATUS = { active: ["kept", "ok"], retired: ["retired later", "warn"], rejected: ["not kept", ""], redundant: ["helped alone; overlaps what was kept", "warn"], invalid: ["invalid", "bad"], candidate: ["being tried", ""] };
+const statusHTML = (s) => { const [t, c] = STATUS[s] || [s || "–", ""]; return `<span class="${c}">${esc(t)}</span>`; };
+const deltaHTML = (x) => x == null ? "–" : `<span class="${x > 0 ? "ok" : x < 0 ? "bad" : ""}">${signed(x)}</span>`;
+const impSum = (f) => f.importance ? f.importance.reduce((a, b) => a + (b || 0), 0) : null;
+function impHTML(r) {   // one value: its importance; several: the most important one, named
+  const imp = r.importance || [];
+  if (!imp.length) return "–";
+  if (imp.length === 1) return deltaHTML(imp[0]);
+  let k = 0; imp.forEach((v, i) => { if ((v ?? -1e9) > (imp[k] ?? -1e9)) k = i; });
+  return `${deltaHTML(imp[k])} <span class="hint">${esc((r.columns || [])[k] || "")}</span>`;
+}
+function featTable(fs, sortByValid = false) {
+  if (!fs.length) return `<div class="empty">No features here in this generation.</div>`;
+  const list = sortByValid ? [...fs].sort((a, b) => (b.delta_valid ?? -1e9) - (a.delta_valid ?? -1e9)) : fs;
+  const rows = list.map((f) => `<tr class="click" data-fid="${esc(f.id)}"><td>${esc(f.id)}</td><td><b>${esc(f.name || "–")}</b></td><td><span class="chip ${esc(f.branch)}">${esc(f.branch)}</span></td>
+    <td class="num">${deltaHTML(f.delta_train)}</td><td class="num">${deltaHTML(f.delta_valid)}</td><td>${statusHTML(f.status)}</td>
+    <td>${esc(((f.status === "invalid" ? f.error : f.description || f.note) || "").split("\n").pop().slice(0, 150))}</td></tr>`);
+  return `<div class="tablewrap"><table><thead><tr><th>Feature</th><th>Name</th><th>Branch</th><th class="num">Train</th><th class="num">Validation</th><th>Verdict</th><th>What it measures</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>
+    <div class="hint">Train and Validation: how much better the policy does with the feature than the same refit without it (higher is better). Validation instances are never used for fitting; they decide what is kept. Click a row for the code.</div>`;
+}
+function libTable(rows) {
+  if (!rows.length) return `<div class="empty">The library is empty: the policy is Code Zero.</div>`;
+  const top = (r) => { const cols = (r.columns || []).map((c, i) => [c, (r.weights || [])[i], (r.importance || [])[i]]);
+    cols.sort((a, b) => Math.abs(b[2] ?? b[1] ?? 0) - Math.abs(a[2] ?? a[1] ?? 0));
+    return cols.slice(0, 3).map(([c, w]) => `${esc(c)} ${w != null ? signed(w, 2) : ""}`).join(" · ") + (cols.length > 3 ? ` <span class="hint">+${cols.length - 3} more</span>` : ""); };
+  return `<div class="tablewrap"><table><thead><tr><th>Feature</th><th>Name</th><th>Branch</th><th class="num">Made in</th><th class="num">Weights</th><th class="num">Importance</th><th>Largest weights</th></tr></thead><tbody>${rows.map((r) => `<tr class="click" data-fid="${esc(r.id)}"><td>${esc(r.id)}</td><td><b>${esc(r.name)}</b></td><td><span class="chip ${esc(r.branch)}">${esc(r.branch)}</span></td><td class="num">${r.generation ?? 0}</td><td class="num">${(r.columns || []).length}</td><td class="num">${impHTML(r)}</td><td>${top(r)}</td></tr>`).join("")}</tbody></table></div>
+    <div class="hint">Importance: how much the validation score drops when the value's weight is set to zero (bigger = it matters more; a feature whose values together score below zero hurts and is retired). For a feature with several values, the most important one is shown.</div>`;
+}
+function diagTable(diag) {
+  const fams = gapsOf(diag);
+  if (!fams.length) return `<div class="empty">No packing comparison for this generation.</div>`;
+  const jobs = (d) => Object.entries(d || {}).sort((a, b) => +a[0] - +b[0]).map(([k, v]) => `${k}:${v}`).join(" ");
+  const pats = (d) => Object.entries(d || {}).slice(0, 3).map(([k, v]) => `${esc(k)} ×${v}`).join("<br>");
+  const rows = fams.map(([fam, gap]) => { const c = diag[fam], ch = c.champion, op = c.optimum || {};
+    return `<tr><td><b>${esc(fam)}</b><div class="hint">${esc(c.instance)}</div></td><td class="num">${ch.bins}<br><span class="hint">${op.bins ?? "–"}</span></td><td class="num"><b class="${gap > 0 ? "warn" : "ok"}">+${gap}</b></td>
+      <td class="num">${fmt(ch.mean_jobs, 2)}<br><span class="hint">${op.mean_jobs != null ? fmt(op.mean_jobs, 2) : "–"}</span></td><td>${jobs(ch.jobs_per_bin)}<br><span class="hint">${jobs(op.jobs_per_bin)}</span></td>
+      <td class="num">${ch.stranded}<br><span class="hint">${op.stranded ?? "–"}</span></td><td class="num">${pct(ch.left_cpu * 100, 0)} / ${pct(ch.left_mem * 100, 0)}<br><span class="hint">${op.left_cpu != null ? `${pct(op.left_cpu * 100, 0)} / ${pct(op.left_mem * 100, 0)}` : "–"}</span></td>
+      <td>${pats(ch.patterns)}</td><td class="hint">${pats(op.patterns)}</td></tr>`; });
+  return `<div class="tablewrap"><table><thead><tr><th>Family</th><th class="num">Bins</th><th class="num">Extra</th><th class="num">Jobs / bin</th><th>Bins by number of jobs</th><th class="num">Stranded</th><th class="num">Room left CPU / mem</th><th>Most common bins: policy</th><th>near-optimal</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>
+    <div class="hint">Each cell: the policy's packing on top, a near-optimal packing of the same jobs below (grey). Job classes per resource, CPU then memory: S under 20% of a bin, M 20–40%, L 40% or more. Stranded: one resource nearly full while over a quarter of the other is left. This is what the Researcher reads; the Mutator never sees it.</div>`;
+}
+function featHypBlock(h, feats) {
+  const f = feats.find((x) => x.id === h.feature_id);
+  return `<div class="hyp"><div class="meta">${esc(h.id)}${f ? ` → <a href="#" data-fid="${esc(f.id)}">${esc(f.id)} ${esc(f.name)}</a>` : ""}${h.builds_on ? ` · builds on ${esc(h.builds_on)}` : ""} · <b class="v-${esc(h.verdict)}">${esc(h.verdict)} ${h.delta != null ? signed(h.delta) : ""}</b> <span class="hint">on validation</span></div>
+    <div>${esc(h.claim)}</div><div class="hint"><b>Feature:</b> ${esc(h.change)}</div>${h.prediction ? `<div class="hint"><b>Should move:</b> ${esc(h.prediction)}</div>` : ""}</div>`;
+}
+function renderDetailFeatures(d) {
+  const titles = { library: "Library: the policy going in", inspect: "Inspect: the policy's packings next to near-optimal ones", researcher: "Researcher: feature ideas", coder: "Coder: the features written", mutator: "Mutator: variants and fresh features", fit: "Fit: every feature tried", accept: "Accept: what was kept" };
+  $("detailTitle").textContent = `${titles[selNode] || selNode} · generation ${selGen}`;
+  if (!d) return `<div class="empty">Nothing recorded for generation ${selGen} yet.</div>`;
+  const feats = d.features || [], hyps = d.hypotheses || [], rec = d.record || {}, calls = (re) => (d.calls || []).filter((c) => re.test(c.role || ""));
+  const champLine = (c, label) => c ? `<p>${label} <a href="#" data-pid="${esc(c.id)}">${esc(c.id)}</a>: train ${fmt(c.train)}, validation ${fmt(c.valid)}</p>` : "";
+  if (selNode === "library") return selGen === 0
+    ? `<p class="hint">Generation 0 is Code Zero and nothing else: the library is empty, so every bin scores 0 and each job goes into the oldest bin it fits (first fit). Every gain after this is the search's own.</p>` + champLine(d.champion, "Code Zero:")
+    : champLine(d.champion_in, "Champion going in:") + libTable(d.library_in || []);
+  if (selNode === "inspect") return d.inspect === false ? `<div class="empty">The packing comparison is switched off for this run (--no-inspect).</div>` : selGen === 0 ? `<div class="empty">Generation 0 has no inspection.</div>` : diagTable(d.diagnostics);
+  const deepF = feats.filter((f) => f.branch === "deep");
+  if (selNode === "researcher") return (hyps.length ? hyps.map((h) => featHypBlock(h, feats)).join("")
+      : deepF.length ? `<p class="hint">The ideas and their verdicts are written when this generation ends. The features written from them so far:</p>` + featTable(deepF)
+      : `<div class="empty">No feature ideas this generation${rec.generation == null ? " yet" : ""}.</div>`)
+    + `<h3>Calls (click one for the full prompt, reply and reasoning)</h3>` + callTable(calls(/^feature_researcher/));
+  if (selNode === "coder") return featTable(feats.filter((f) => f.branch === "deep")) + `<h3>Calls</h3>` + callTable(calls(/^feature_coder/));
+  if (selNode === "mutator") return `<p class="hint">Variants of the policy's features and fresh ones, written from the policy's code and score only.</p>` + featTable(feats.filter((f) => f.branch === "wide")) + `<h3>Calls</h3>` + callTable(calls(/^feature_mutator/));
+  if (selNode === "fit") {
+    const fit = rec.fit, ph = rec.phase_seconds;
+    const c = rec.champion_refit, ci = d.champion_in;
+    const refitLine = c && ci ? (c.kept
+        ? `<p><b>Champion refit</b> (its own weights, no new feature): train ${deltaHTML(c.train - ci.train)}, validation ${deltaHTML(c.valid - ci.valid)}, credited to fitting. The features below were tried on top of it.</p>`
+        : `<p><b>Champion refit</b> (its own weights, no new feature): no gain on ${c.valid == null ? "train" : "validation"}.</p>`) : "";
+    return (fit ? `<p class="hint">${fit.candidates} candidates, ${fit.invalid} invalid, ${fit.trials} tried; ${fit.evals} evaluations${ph ? `; agents ${Math.round(ph.agents)}s, fitting ${Math.round(ph.fit)}s` : ""}.</p>` : "")
+      + champLine(ci, "Champion going in:") + refitLine + featTable(feats, true);
+  }
+  if (selNode === "accept") {
+    const kept = feats.filter((f) => (rec.accepted || []).includes(f.id)), retired = rec.retired || [];
+    return champLine(d.champion, "Champion going out:")
+      + (selGen === 0 ? "" : kept.length ? `<h3>Kept</h3>` + featTable(kept) : `<p>Nothing kept this generation${rec.best_id !== (d.champion_in || {}).id ? "; the weights were refitted" : ""}.</p>`)
+      + (retired.length ? `<p class="warn">Retired: ${retired.map((r) => `<a href="#" data-fid="${esc(r)}">${esc(r)}</a>`).join(", ")} (switching them off scored better on validation).</p>` : "")
+      + `<h3>Library going out</h3>` + libTable(d.library_out || []);
+  }
+  return "";
+}
+async function showFeature(fid) {
+  const f = await api(`/api/runs/${current}/feature/${fid}`);
+  const cols = (f.columns || []).map((c, i) => `<tr><td>${esc(c)}</td><td class="num">${f.weights && f.weights[i] != null ? signed(f.weights[i], 3) : "–"}</td><td class="num">${f.importance && f.importance[i] != null ? signed(f.importance[i], 3) : "–"}</td></tr>`).join("");
+  openDlg(`${f.id} · ${f.name} · ${f.branch} · ${(STATUS[f.status] || [f.status])[0]}`,
+    `<p>${esc(f.description || "")}</p>${f.note ? `<p class="hint">${esc(f.note)}</p>` : ""}
+     <p>Made in generation ${f.generation ?? 0}${f.hypothesis_id ? ` for ${esc(f.hypothesis_id)}` : ""}${(f.parent_ids || []).length ? ` · variant of ${esc(f.parent_ids.join(", "))}` : ""} · train ${deltaHTML(f.delta_train)} · validation ${deltaHTML(f.delta_valid)}</p>
+     ${f.error ? `<pre class="code text bad">${esc(f.error)}</pre>` : ""}
+     ${cols && f.status !== "invalid" ? `<details ${(f.columns || []).length <= 20 ? "open" : ""}><summary>Values, weights and importance (latest)</summary><div class="tablewrap"><table><thead><tr><th>Value</th><th class="num">Weight</th><th class="num">Importance</th></tr></thead><tbody>${cols}</tbody></table></div></details>` : ""}
+     <pre class="code">${esc(f.code || "")}</pre>`);
+}
+function renderDetail(d) {
+  if (engine() === "features") {
+    setHTML($("detail"), renderDetailFeatures(d));
+    $("detail").querySelectorAll("tr[data-fid], a[data-fid]").forEach((el) => el.onclick = (e) => { e.preventDefault(); showFeature(el.dataset.fid); });
+    $("detail").querySelectorAll("a[data-pid]").forEach((el) => el.onclick = (e) => { e.preventDefault(); showProgram(el.dataset.pid); });
+    $("detail").querySelectorAll("tr[data-line]").forEach((tr) => tr.onclick = () => showCall(tr.dataset.line));
+    return;
+  }
+  const titles ={ pool: "Pool going in", researcher: "Researcher: hypotheses", coder: "Coder: the tests and their verdicts", mutator: "Mutator: variants and fresh ideas", tune: "Tune: polished numbers", evaluator: "Evaluator: everything scored", merge: "Merge: the pool going out" };
+  $("detailTitle").textContent = `${titles[selNode] || selNode} · generation ${selGen}`;
+  if (!d) { setHTML($("detail"), `<div class="empty">Nothing recorded for generation ${selGen} yet.</div>`); return; }
+  const progs = d.programs || [], hyps = d.hypotheses || [], calls = (re) => (d.calls || []).filter((c) => re.test(c.role || ""));
+  let html = "";
+  if (selNode === "pool") html = `<p class="hint">The programs this generation started from: the best found so far.</p>` + poolTable(d.pool_in);
+  else if (selNode === "researcher") html = (hyps.length ? hyps.map((h) => hypBlock(h, progs, false)).join("") : `<div class="empty">No hypotheses this generation.</div>`)
+      + `<h3>Calls (click one for the full prompt, reply and reasoning)</h3>` + callTable(calls(/^researcher/));
+  else if (selNode === "coder") html = (hyps.length ? hyps.map((h) => hypBlock(h, progs, true)).join("") : `<div class="empty">No tests this generation.</div>`) + `<h3>Calls</h3>` + callTable(calls(/^coder/));
+  else if (selNode === "mutator") html = progTable(progs.filter((p) => p.branch === "wide")) + `<h3>Calls</h3>` + callTable(calls(/^mutator/));
+  else if (selNode === "tune") {
+    const t = d.record && d.record.tune;
+    html = (t ? `<p class="hint">Tuned ${esc((t.targets || []).join(", ") || "nothing")}: ${t.tried || 0} evaluations, ${t.improved || 0} kept.</p>` : "")
+      + progTable(progs.filter((p) => p.branch === "tune")) + `<p class="hint">Deep tests also get their new numbers tuned before they're judged: see the Coder step.</p>`;
+  } else if (selNode === "evaluator") html = progTable(progs);
+  else if (selNode === "merge") html = `<p class="hint">The next generation's pool; programs made in this generation are marked new.</p>` + poolTable(d.pool_out, new Set(progs.map((p) => p.id)));
+  setHTML($("detail"), html);
+  $("detail").querySelectorAll("tr[data-pid]").forEach((tr) => tr.onclick = () => showProgram(tr.dataset.pid));
+  $("detail").querySelectorAll("tr[data-line]").forEach((tr) => tr.onclick = () => showCall(tr.dataset.line));
+}
+async function showProgram(pid) {
+  const p = await api(`/api/runs/${current}/program/${pid}`);
+  openDlg(`${p.id} · ${p.branch} · ${p.valid ? fmt(p.score) : "invalid"}`,
+    `<p>${esc(p.note || "")}</p>${p.error ? `<pre class="code text bad">${esc(p.error)}</pre>` : ""}
+     ${p.families ? `<div class="tablewrap"><table><tr>${Object.keys(p.families).map((f) => `<th class="num">${esc(f)}</th>`).join("")}</tr><tr>${Object.values(p.families).map((v) => `<td class="num">${fmt(v, 2)}</td>`).join("")}</tr></table></div><div class="hint">Excess % over the simple lower bound, by family (the evaluator's units).</div>` : ""}
+     <pre class="code">${esc(p.code || "")}</pre>`);
+}
+async function showCall(line) {
+  const c = await api(`/api/runs/${current}/call?line=${line}`);
+  openDlg(`${c.role} · ${c.model || ""} · ${c.seconds}s${c.finish ? " · " + c.finish : ""}`,
+    `${c.error ? `<pre class="code text bad">${esc(c.error)}</pre>` : ""}
+     <details open><summary>Reply</summary><pre class="code text">${esc(c.reply || "")}</pre></details>
+     ${c.reasoning ? `<details><summary>Hidden reasoning (${c.reasoning.length.toLocaleString()} characters)</summary><pre class="code text">${esc(c.reasoning)}</pre></details>` : ""}
+     <details><summary>What the agent received</summary><pre class="code text">${esc(c.user || "")}</pre></details>
+     <details><summary>System prompt</summary><pre class="code text">${esc(c.system || "")}</pre></details>`);
+}
+function openDlg(title, html) { $("dlgTitle").textContent = title; $("dlgBody").innerHTML = html; $("dlg").showModal(); }
+$("dlgClose").onclick = () => $("dlg").close();
+document.querySelectorAll("dialog [data-close]").forEach((b) => b.onclick = () => b.closest("dialog").close());
+
+// ---------------------------------------------------------------- progress chart
+$("unitSeg").querySelectorAll("button").forEach((b) => b.onclick = () => { unit = b.dataset.u; $("unitSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); drawChart(); });
+$("xSeg").querySelectorAll("button").forEach((b) => b.onclick = () => { xAxis = b.dataset.x; $("xSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); drawChart(); });
+let chartGeom = null;
+const val = (row) => unit === "progress" ? row.progress : row.score;
+const show = (v) => unit === "progress" ? pct(v) : fmt(v);
+function drawChart() {
+  const main = series[current];
+  if (!main || !main.series.length) { setHTML($("chart"), `<text x="500" y="180" text-anchor="middle">No generations yet.</text>`); $("cmpTable").innerHTML = ""; setHTML($("chartLegend"), ""); return; }
+  if (unit === "progress" && main.series[0].progress == null) { unit = "score"; $("unitSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.u === "score")); }
+  const runs = [{ name: current, color: "var(--ink)", data: main.series, main: true }, ...compare.filter((n) => series[n]).map((n, i) => ({ name: n, color: CMP_COLORS[i], data: series[n].series }))];
+  const refLines = [], short = (s) => s.split(" (")[0];
+  if (unit === "progress") {
+    refLines.push(["Code Zero", 0]);
+    if (refs.best_classic && refs.best_classic.progress != null) refLines.push([`Best classic: ${short(refs.best_classic.label)}`, refs.best_classic.progress]);
+    if (refs.offline_ffd && refs.offline_ffd.progress != null) refLines.push(["Offline packer (sees all jobs)", refs.offline_ffd.progress]);
+    if (refs.optimal) refLines.push(["Optimal packing", 100]);
+  } else {
+    if (main.start) refLines.push(["Code Zero", main.start.score]);
+    if (refs.best_classic) refLines.push([`Best classic: ${short(refs.best_classic.label)}`, refs.best_classic.score]);
+    if (refs.offline_ffd) refLines.push(["Offline packer (sees all jobs)", refs.offline_ffd.score]);
+    if (refs.optimal) refLines.push(["Optimal packing", refs.optimal.score]);
+  }
+  const marks = [];   // each generation's best new program per branch, for this run (always shown)
+  for (const row of main.series) for (const b of ["deep", "wide", "tune"]) if (row[b] && val(row[b]) != null) marks.push({ x: row[xAxis], y: val(row[b]), b });
+  const ys = runs.flatMap((r) => r.data.map(val).filter((v) => v != null)).concat(refLines.map((r) => r[1]), marks.map((m) => m.y));
+  let lo = Math.min(...ys), hi = Math.max(...ys);
+  if (unit === "progress") { lo = Math.min(0, lo); hi = Math.max(hi, 10); }
+  const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  const maxX = Math.max(1, ...runs.flatMap((r) => r.data.map((d) => d[xAxis])));
+  const W = 1000, H = 360, L = 58, R = 220, T = 14, B = 40;
+  const X = (x) => L + (x / maxX) * (W - L - R), Y = (y) => T + (1 - (y - lo) / (hi - lo)) * (H - T - B);
+  let svg = "";
+  const raw = (hi - lo) / 5, mag = Math.pow(10, Math.floor(Math.log10(raw))), tstep = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((x) => x >= raw);
+  const dec = tstep >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(tstep)));
+  for (let v = Math.ceil(lo / tstep) * tstep; v <= hi + 1e-9; v += tstep) { const y = Y(v); svg += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--rule)"/><text x="${L - 8}" y="${y + 4}" text-anchor="end">${unit === "progress" ? v.toFixed(dec) + "%" : v.toFixed(Math.max(dec, 1))}</text>`; }
+  const step = Math.max(1, Math.ceil(maxX / (xAxis === "generation" ? 12 : 10)));
+  for (let g = 0; g <= maxX; g += step) svg += `<text x="${X(g)}" y="${H - B + 18}" text-anchor="middle">${g}</text>`;
+  svg += `<text x="${(L + W - R) / 2}" y="${H - 4}" text-anchor="middle">${xAxis}</text>`;
+  const used = [];
+  for (const [name, v] of refLines) {
+    if (v < lo || v > hi) continue;
+    const y = Y(v); let ly = y + 4; for (const u of used.sort((a, b) => a - b)) if (Math.abs(u - ly) < 13) ly = u + 13; used.push(ly);
+    svg += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="var(--muted)" stroke-dasharray="5 4"/><text x="${W - R + 8}" y="${ly}">${esc(name)} ${unit === "progress" ? v.toFixed(0) + "%" : v.toFixed(2)}</text>`;
+  }
+  for (const r of [...runs].reverse()) {
+    let d = "", first = true;
+    for (const row of r.data) { const v = val(row); if (v == null) continue; const x = X(row[xAxis]), y = Y(v); d += first ? `M${x},${y}` : ` H${x} V${y}`; first = false; }
+    if (d) svg += `<path d="${d}" fill="none" stroke="${r.color}" stroke-width="${r.main ? 2.5 : 2}"/>`;
+  }
+  for (const m of marks) {
+    const x = X(m.x), y = Y(m.y);
+    svg += m.b === "deep" ? `<circle cx="${x}" cy="${y}" r="4.5" fill="var(--deep)" stroke="var(--card)" stroke-width="2"/>`
+      : m.b === "wide" ? `<rect x="${x - 4}" y="${y - 4}" width="8" height="8" fill="var(--wide)" stroke="var(--card)" stroke-width="2"/>`
+      : `<path d="M${x},${y - 5.5} L${x + 5.5},${y} L${x},${y + 5.5} L${x - 5.5},${y} Z" fill="var(--tune)" stroke="var(--card)" stroke-width="2"/>`;
+  }
+  const last = main.series[main.series.length - 1], lv = val(last);
+  if (lv != null) svg += `<text x="${X(last[xAxis]) + 6}" y="${Y(lv) - 8}" style="fill:var(--ink);font-weight:700">${show(lv)}</text>`;
+  svg += `<line id="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--ink2)" stroke-width="1" visibility="hidden"/>`;
+  svg += `<rect id="hit" x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/>`;
+  setHTML($("chart"), svg);
+  chartGeom = { runs, maxX, L, R, W };
+  const hit = $("hit"); if (hit) { hit.onmousemove = chartHover; hit.onmouseleave = () => { $("tip").style.display = "none"; const xh = $("xh"); if (xh) xh.setAttribute("visibility", "hidden"); }; }
+  const has = (b) => marks.some((m) => m.b === b), feat = engine() === "features";
+  setHTML($("chartLegend"), runs.map((r) => `<span><i style="background:${r.color}"></i>${esc(r.main ? (feat ? "this run: champion" : "this run: best") : r.name)}</span>`).join("")
+    + (has("deep") ? `<span><i class="dot2" style="background:var(--deep)"></i>${feat ? "best deep feature (policy refitted with it)" : "best new deep program"}</span>` : "")
+    + (has("wide") ? `<span><i class="dot2" style="background:var(--wide);border-radius:2px"></i>${feat ? "best Mutator feature (policy refitted with it)" : "best new Mutator program"}</span>` : "")
+    + (has("tune") ? `<span><i class="dot2" style="background:var(--tune);border-radius:1px"></i>best tuned program</span>` : "")
+    + `<span><i class="dash"></i>yardsticks</span>`);
+  renderCmpTable(runs);
+}
+function chartHover(e) {
+  const g = chartGeom, rect = $("chart").getBoundingClientRect();
+  const sx = (e.clientX - rect.left) * (1000 / rect.width), xv = (sx - g.L) / (g.W - g.L - g.R) * g.maxX;
+  const lines = [];
+  for (const r of g.runs) {
+    let best = null; for (const row of r.data) if (row[xAxis] <= xv + 1e-9 && val(row) != null) best = row;
+    if (best) lines.push(`<div><span style="color:${r.color}">■</span> ${esc(r.main ? "this run" : r.name)}: <b>${show(val(best))}</b> <span class="hint">generation ${best.generation}, ${best.minutes} min</span></div>`);
+    if (best && r.main) for (const [b, label, color] of [["deep", "best deep", "var(--deep)"], ["wide", "best Mutator", "var(--wide)"], ["tune", "best tuned", "var(--tune)"]])
+      if (best[b] && val(best[b]) != null) lines.push(`<div class="hint" style="padding-left:14px"><span style="color:${color}">●</span> ${label} in generation ${best.generation}: ${show(val(best[b]))} (${esc(best[b].id)})</div>`);
+  }
+  if (!lines.length) return;
+  const xh = $("xh"); xh.setAttribute("x1", sx); xh.setAttribute("x2", sx); xh.setAttribute("visibility", "visible");
+  const tip = $("tip"); tip.innerHTML = `<div class="hint">${xAxis} ${xAxis === "generation" ? Math.floor(xv) : xv.toFixed(1)}</div>` + lines.join("");
+  tip.style.display = "block"; tip.style.left = Math.min(e.clientX + 14, innerWidth - 280) + "px"; tip.style.top = (e.clientY + 14) + "px";
+}
+function renderCmpTable(runs) {
+  if (runs.length < 2) { $("cmpTable").innerHTML = ""; return; }
+  const n = Math.min(...runs.map((r) => r.data.length)) - 1;
+  const row = (r) => { const end = r.data[r.data.length - 1], at = r.data[Math.min(n, r.data.length - 1)];
+    return `<tr><td><span style="color:${r.color}">■</span> ${esc(r.main ? "this run" : r.name)}</td><td class="num">${end.generation}</td><td class="num">${end.minutes}</td><td class="num">${pct(end.progress)}</td><td class="num">${fmt(end.score)}</td><td class="num">${pct(at.progress)}</td><td class="num">${fmt(at.score)}</td></tr>`; };
+  $("cmpTable").innerHTML = `<table style="margin-top:8px"><thead><tr><th>Run</th><th class="num">Generations</th><th class="num">Minutes</th><th class="num">Best progress</th><th class="num">Best score</th><th class="num">Progress at gen ${n}</th><th class="num">Score at gen ${n}</th></tr></thead><tbody>${runs.map(row).join("")}</tbody></table>`;
+}
+
+// ---------------------------------------------------------------- controls
+async function act(fn, label) { try { const r = await fn(); $("phaseLine").textContent = r && r.message ? r.message : `${label}: done`; tick(true); } catch (e) { $("phaseLine").innerHTML = `<span class="bad">${esc(e.message)}</span>`; } }
+$("stopBtn").onclick = () => act(() => api(`/api/runs/${current}/stop`, { method: "POST", body: {} }), "Stop");
+$("killBtn").onclick = () => { if (confirm("Kill the run now? Everything up to the last finished generation is kept.")) act(() => api(`/api/runs/${current}/stop`, { method: "POST", body: { force: true } }), "Kill"); };
+$("resumeBtn").onclick = () => { const more = prompt("How many more generations?", "10"); if (more) act(() => api(`/api/runs/${current}/resume`, { method: "POST", body: { more: +more } }), "Resume"); };
+$("reportBtn").onclick = () => { $("phaseLine").textContent = "Scoring on held-out instances…"; act(() => api(`/api/runs/${current}/report`, { method: "POST", body: {} }), "Held-out check"); };
+$("publishBtn").onclick = () => act(() => api(`/api/runs/${current}/publish`, { method: "POST", body: {} }), "Publish");
+$("newBtn").onclick = () => $("newDlg").showModal();
+$("settingsBtn").onclick = async () => { await loadSettings(); $("settingsDlg").showModal(); };
+function engineFields() {
+  const feat = $("engine").value === "features";
+  document.querySelectorAll(".eng-features").forEach((el) => el.style.display = feat ? "" : "none");
+  document.querySelectorAll(".eng-programs").forEach((el) => el.style.display = feat ? "none" : "");
+  $("variantsLabel").textContent = feat ? "Mutator features per generation" : "Mutator programs per generation";
+  $("hypothesesLabel").textContent = feat ? "Researcher feature ideas" : "Researcher hypotheses";
+  $("variants").placeholder = feat ? "4" : "6"; $("fresh").placeholder = feat ? "1" : "2";
+}
+$("engine").onchange = engineFields; engineFields();
+$("runBtn").onclick = async () => {
+  const feat = $("engine").value === "features";
+  const body = { engine: $("engine").value, mode: $("mode").value, fake: $("fake").checked, tune: $("tune").checked, inspect: $("inspect").checked };
+  const keys = ["generations", "max_minutes", "workers", "variants", "fresh", "hypotheses", "pro_every"]
+    .concat(feat ? ["trial_evals", "refit_evals", "accept_margin", "fit_workers"] : ["pool_size", "epsilon", "judge_tune_evals"]);
+  for (const k of keys) body[k] = $(k).value;
+  try { const r = await api("/api/runs/start", { method: "POST", body }); current = r.name; selGen = null; $("follow").checked = true; $("newDlg").close(); await refreshRuns(); tick(true); }
+  catch (e) { $("runOut").textContent = e.message; }
+};
+const FIELDS = ["HELIX_PROVIDER", "LUMINAL_BASE_URL", "LUMINAL_API_KEY", "HELIX_FLASH_MODEL", "HELIX_PRO_MODEL", "LUMINAL_EXTRA_BODY", "LOCAL_BASE_URL", "LOCAL_MODEL", "MONGODB_URI", "MONGODB_DB"];
+async function loadSettings() {
+  const s = await api("/api/settings");
+  for (const k of FIELDS) { const f = s[k], el = $(k); if (!f || !el) continue; if (f.secret) { el.value = ""; el.placeholder = f.set ? `saved (${f.hint || "set"}); leave blank to keep` : "not set"; } else el.value = f.value || ""; }
+}
+$("saveBtn").onclick = async () => { const body = {}; for (const k of FIELDS) body[k] = $(k).value; try { await api("/api/settings", { method: "POST", body }); $("connectOut").textContent = "Saved."; loadSettings(); } catch (e) { $("connectOut").textContent = e.message; } };
+$("testLlmBtn").onclick = async () => { $("connectOut").textContent = "Asking the model…"; try { const r = await api("/api/check/llm", { method: "POST" }); $("connectOut").textContent = r.results.map((x) => `${x.ok ? "OK  " : "FAIL"} ${x.tier} ${x.model}: ${x.detail}`).join("\n"); } catch (e) { $("connectOut").textContent = e.message; } };
+$("testMongoBtn").onclick = async () => { $("connectOut").textContent = "Connecting…"; try { const r = await api("/api/check/mongo", { method: "POST" }); $("connectOut").textContent = JSON.stringify(r, null, 1); } catch (e) { $("connectOut").textContent = e.message; } };
+
+(async function init() {
+  renderCmpChips();
+  await refreshRuns();
+  const loadRefs = async () => { try { refs = await api("/api/references"); } catch { } if (!refs.best_classic) setTimeout(loadRefs, 4000); else { renderTiles(); drawChart(); } };
+  loadRefs();
+  tick(true);
+  setInterval(tick, 2500);
+  setInterval(refreshRuns, 15000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,216 @@
+"""Programs, hypotheses, and the run's record on disk.
+
+Everything a run produces goes into its run folder as plain files, so a crashed
+run can be resumed and every decision can be read back afterwards:
+
+  config.json        the settings the run was started with
+  programs.jsonl     one line per scored program: code, scores, branch, parent, hypothesis
+  hypotheses.jsonl   the research log: one line per tested hypothesis and its verdict
+  generations.jsonl  one line per generation: survivors, best score, LLM calls, time
+  llm_calls.jsonl    every prompt and reply (written by llm.py)
+  best_program.py    the best program so far
+  candidates/        every candidate as a .py file, named by its id
+"""
+from __future__ import annotations   # lets `str | None` hints load on Python 3.9
+
+import hashlib
+import json
+import threading
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+
+
+@dataclass
+class Program:
+    id: str
+    code: str
+    generation: int
+    branch: str                       # seed | wide | deep | zeroshot | baseline
+    parent_id: str | None = None
+    hypothesis_id: str | None = None
+    note: str = ""                    # the agent's own one-line description of what it did
+    valid: bool = False
+    score: float | None = None
+    families: dict = field(default_factory=dict)   # family -> excess %
+    error: str | None = None
+    model: str = ""
+    repaired: bool = False
+    duplicate_of: str | None = None
+    probe: bool = False               # a knock-out measurement: kept in the log, not a candidate for the pool
+    trial: bool = False               # feature engine: a candidate feature tried on the champion; never the best
+    valid_score: float | None = None  # feature engine: score on the validation instances
+    features: list | None = None      # feature engine: the feature ids this policy uses
+
+    @property
+    def rank_key(self):
+        """Invalid programs rank below every valid one."""
+        return self.score if self.valid and self.score is not None else float("-inf")
+
+
+@dataclass
+class Hypothesis:
+    id: str
+    generation: int
+    base_id: str
+    claim: str
+    change: str
+    prediction: str
+    program_id: str | None = None
+    base_score: float | None = None
+    new_score: float | None = None
+    delta: float | None = None
+    # improve: supported | refuted | flat | no-effect      cause (knock-out): matters | minor | no-effect | removal-helps
+    # either: invalid | unchanged
+    verdict: str = "pending"
+    family_shift: dict = field(default_factory=dict)   # family -> change in excess % (negative = better)
+    kind: str = "improve"             # cause = knock-out measurement; improve = attempt to beat the base
+    builds_on: str = ""               # the hypothesis id this test follows from, if any
+    raw_delta: float | None = None    # score change as the Coder wrote it, when its new numbers were then tuned
+    feature_id: str | None = None     # feature engine: the feature written for this idea
+
+
+def judge(h, base, new, epsilon):
+    """Fill in a hypothesis's verdict by comparing its program with the base program.
+
+    A knock-out (cause) program is a measurement: it's marked as a probe so it never joins the pool,
+    unless removing the part actually made the program better, in which case it's a real candidate.
+    """
+    h.program_id = new.id
+    h.base_score = base.score
+    if new.duplicate_of == base.id:
+        h.verdict = "unchanged"           # the Coder produced the base program again
+        new.probe = h.kind == "cause"
+        return h
+    if not new.valid:
+        h.verdict = "invalid"
+        return h
+    h.new_score = new.score
+    h.delta = round(new.score - base.score, 4)
+    h.family_shift = {f: round(new.families[f] - base.families[f], 3) for f in base.families if f in new.families}
+    no_effect = bool(h.family_shift) and all(v == 0 for v in h.family_shift.values())
+    if h.kind == "cause":
+        if no_effect:
+            h.verdict = "no-effect"       # the part never changed a single placement: dead weight
+        elif h.delta > epsilon:
+            h.verdict = "removal-helps"   # the part was hurting: the knock-out is a better program
+        elif h.delta < -epsilon:
+            h.verdict = "matters"         # the part is worth about -delta: a reason the base wins
+        else:
+            h.verdict = "minor"
+        new.probe = h.verdict != "removal-helps"
+    else:
+        h.verdict = ("no-effect" if no_effect else "supported" if h.delta > epsilon
+                     else "refuted" if h.delta < -epsilon else "flat")
+    return h
+
+
+def _code_hash(code):
+    lines = [line.rstrip() for line in code.strip().splitlines()]
+    return hashlib.sha1("\n".join(lines).encode()).hexdigest()
+
+
+class Store:
+    def __init__(self, run_dir):
+        self.dir = Path(run_dir)
+        self.candidates = self.dir / "candidates"
+        self.candidates.mkdir(parents=True, exist_ok=True)
+        self.programs = {}
+        self.hypotheses = []
+        self._by_hash = {}
+        self._counters = {"p": 0, "h": 0, "f": 0}
+        self._lock = threading.Lock()
+        self.mirror = None        # optional MongoDB copy (helix/mongo.py), set by run.py
+
+    # ------------------------------------------------------------ ids and lookup
+    def new_id(self, kind):
+        with self._lock:
+            self._counters[kind] += 1
+            return f"{kind}{self._counters[kind]:04d}"
+
+    def duplicate_of(self, code):
+        """The already-scored program with identical code, if any."""
+        with self._lock:
+            pid = self._by_hash.get(_code_hash(code))
+        return self.programs.get(pid) if pid else None
+
+    def candidate_path(self, pid):
+        return self.candidates / f"{pid}.py"
+
+    def ranked(self, ids=None):
+        with self._lock:
+            progs = [self.programs[i] for i in ids] if ids is not None else list(self.programs.values())
+        return sorted(progs, key=lambda p: p.rank_key, reverse=True)
+
+    def best(self):
+        with self._lock:
+            return self._best_unlocked()
+
+    def _best_unlocked(self):
+        valid = [p for p in self.programs.values() if p.valid and not p.probe and not p.trial]   # measurements never lead
+        return max(valid, key=lambda p: p.rank_key) if valid else None
+
+    # ------------------------------------------------------------ recording
+    def add_program(self, p):
+        with self._lock:
+            self.programs[p.id] = p
+            self._by_hash.setdefault(_code_hash(p.code), p.id)
+            self._append("programs.jsonl", asdict(p))
+            if self._best_unlocked() is p:
+                (self.dir / "best_program.py").write_text(
+                    f"# {p.id} | score {p.score} | generation {p.generation} | {p.branch} branch\n{p.code}"
+                )
+
+    def add_hypothesis(self, h):
+        with self._lock:
+            self.hypotheses.append(h)
+            self._append("hypotheses.jsonl", asdict(h))
+
+    def log_generation(self, record):
+        with self._lock:
+            self._append("generations.jsonl", record)
+
+    def save_config(self, config):
+        (self.dir / "config.json").write_text(json.dumps(config, indent=2))
+        if self.mirror:
+            self.mirror.put("runs", {"config": config}, key="run_id")
+
+    def _append(self, name, record):
+        with (self.dir / name).open("a") as f:
+            f.write(json.dumps(record) + "\n")
+        if self.mirror:   # programs.jsonl -> "programs" collection, keyed by id / generation
+            collection = name.removesuffix(".jsonl")
+            self.mirror.put(collection, dict(record), key="generation" if collection == "generations" else "id")
+
+    # ------------------------------------------------------------ resume
+    @classmethod
+    def load(cls, run_dir):
+        """Rebuild a store from a run folder. Returns (store, last generation record or None)."""
+        store = cls(run_dir)
+        for record in read_records(store.dir / "programs.jsonl"):
+            p = Program(**record)
+            store.programs[p.id] = p
+            store._by_hash.setdefault(_code_hash(p.code), p.id)
+        for record in read_records(store.dir / "hypotheses.jsonl"):
+            store.hypotheses.append(Hypothesis(**record))
+        store._counters["p"] = max([int(i[1:]) for i in store.programs] or [0])
+        store._counters["h"] = max([int(h.id[1:]) for h in store.hypotheses] or [0])
+        gens = read_records(store.dir / "generations.jsonl")
+        return store, (gens[-1] if gens else None)
+
+
+def read_records(path):
+    """Every complete line of a .jsonl file. A run killed mid-write can leave a broken last line: it's
+    skipped, and the file gets a closing newline so the next record starts on a line of its own."""
+    if not path.exists():
+        return []
+    text = path.read_text()
+    if text and not text.endswith("\n"):
+        with path.open("a") as f:
+            f.write("\n")
+    records = []
+    for line in text.splitlines():
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            pass
+    return records
